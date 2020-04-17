@@ -15,111 +15,60 @@ from sklearn.metrics import accuracy_score
 from sklearn.feature_selection import VarianceThreshold
 from sklearn import tree
 import methods as mth
+from math import sqrt
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import RandomizedSearchCV
 
 sn.set()
 
-dataset = pd.read_csv('UJIndoorLoc/trainingData.csv')
-datasetV = pd.read_csv('UJIndoorLoc/validationData.csv')
+trainingUrl = "https://raw.githubusercontent.com/kasrasammak/WifiLocalization/master/UJIndoorLoc/trainingData.csv"
+validationUrl = "https://raw.githubusercontent.com/kasrasammak/WifiLocalization/master/UJIndoorLoc/validationData.csv"
+df_train = pd.read_csv(trainingUrl)
+df_val = pd.read_csv(validationUrl)
 
 
-df1 = dataset.iloc[:,0:520]
-df2 = dataset.iloc[:, 520:]
-df1[:].replace({100: -104}, inplace=True)
-
-df2['BUILDINGFLOOR'] = df2.BUILDINGID.astype(str) + "." + df2.FLOOR.astype(str)
-df2['LATITUDELONGITUDE'] = df2.LATITUDE.astype(str) + "." + df2.LONGITUDE.astype(str)
-df2['LAT-LONG-TIME-USER'] = df2.LATITUDE.astype(str) + "." + df2.LONGITUDE.astype(str) + "." + df2.TIMESTAMP.astype(str) + "." + df2.USERID.astype(str)
-
-dfLatLongTimeUser = df2['LAT-LONG-TIME-USER']
-
-groupDF = pd.concat([df1, df2], axis=1)
-groupDF = groupDF.groupby(["LAT-LONG-TIME-USER"]).mean()
-
-groupDF1 = groupDF.iloc[:,0:520]
-
-groupDF1 = groupDF.reset_index()
-groupppp = groupDF1.iloc[:, 1:]
-mover = list(groupDF1.iloc[:, 1:].columns)
-mover = pd.concat([mover, "LAT-LONG-TIME-USER"])
-mover.append('LAT-LONG-TIME-USER')
-
-groupDF = groupDF1[mover]
-
-valid1 = datasetV.iloc[:,0:520]
-valid2 = datasetV.iloc[:, 520:]
-valid1[:].replace({100: -104}, inplace=True)
-
-
-mf = pd.concat([df1, df2], axis=1)
-
-dfVT = df1
-
-dfVT = variance_threshold_selector(dfVT, 0)
-
-lisst = mth.appender(0,1)
-
-#drop Empty columns from training and validation sets
-df1Drop = mth.dropNoVarianceColumns(df1)
-
-
-dropEmptyList = list(df1Drop.columns)
-X_val = valid1[dropEmptyList]
-y_val_b = valid2['BUILDINGID']
-y_val_f = valid2['FLOOR']
-
-train_test_b[3]
-
-#knn
-XBuild, yBuild = mth.createNewTarget(df1Drop, df2, 'BUILDINGID')
-knn1 = KNeighborsClassifier(n_neighbors = 5, metric='euclidean')
-pred_b, cm_b, model_b, train_test_b = mth.fitPredict(XBuild, yBuild, knn1)
-accuracies_b, train_test_b_cv = mth.checkKCV(XBuild, yBuild, 5, 10)
-
-
-pred_b, _, _, train_test_b = mth.fitPredict(XBuild, yBuild, knn1)
-
-
-XFloor, yFloor = mth.createNewTarget(df1Drop, df2, 'FLOOR')
-pred_f, cm_f, model_f, train_test_f = mth.fitPredict(XFloor, yFloor, knn1)
-accuracies_f, train_test_f_cv = mth.checkKCV(XFloor, yFloor, 5, 10)
-
-XSpace, ySpace = mth.createNewTarget(df1Drop, df2, 'SPACEID')
-pred_s, cm_s, model_s, train_test_s = mth.fitKNNPredict(XSpace, ySpace, 5)
-accuracies_s, train_test_s_cv = mth.checkKCV(XSpace, ySpace, 5, 10)
-
-tree_floor = mth.fitTreePredict(XFloor, yFloor)
+modelknnBuild = initializeModel('knn', param_1 = 4)
+accuracies_b, train_test_b_cv = mth.checkKCV(XBuild, yBuild,  10, )
+accuracies_f, train_test_f_cv = mth.checkKCV(XFloor, yFloor, 10)
+accuracies_s, train_test_s_cv = mth.checkKCV(XSpace, ySpace,  10)
 
 val_pred_b, val_cm_b = mth.predictTest(model_b, valSet_X, valSet_y_b)
 val_pred_f, val_cm_f = mth.predictTest(model_f, valSet_X, valSet_y_f)
 
-model_f, acc_f, pred_f, y_test_f = mth.fitPredictValSet(XFloor, yFloor, X_val, y_val_f, 'knn')
+model_bf, acc_bf, pred_bf, y_test_bf = mth.fitPredictValSet(XBuildFloor, yBuildFloor, X_val, y_val_bf, 'knn', 4)
 
-def evalHyperParams(X, y, X_val, y_val, name, param):
-#    for i in range(0, param):
-#        model[i] = [i]
-#        acc[i] = i
-    appenders = range(0, 4)
-    mylists = []
-#    finalModel = ()
-    for i in appenders:
-        mylists.append([])
-    for i in range(0,param):
-        model = fitPredictValSet(X, y, X_val, y_val, name, param)
-        for j, lst in enumerate(mylists):   
-            j.append(model[lst])
-#        model[i] = instantiateModel(name, param_1 = param)
-#        model[i], y_pred[i], _, _ = fitPredict(X, y, model[i])
-#        acc[i], pred[i], _, _ = predictTest(model[i], X_val, y_val)
-#        finalModel = getBest(model[i], acc[i], i, i, finalModel)
-#    return finalModel[0], finalModel[1], finalModel[2]
-    return mylists
+model_bf_tr, acc_bf_tr, pred_bf_tr, ytest_bf_tr =  mth.fitPredictValSet(XBuildFloor, yBuildFloor, X_val, y_val_bf, 'forest')
+model_bf_for, acc_bf_for, pred_bf_for, ytest_bf_for =  mth.fitPredictValSet(XBuildFloor, yBuildFloor, X_val, y_val_bf, 'forest')
 
+model_lat, acc_lat, pred_lat, ytest_lat =  mth.fitPredictValSet(XLat, yLat, X_val, y_val_lat, 'knnr', 0, neighbors=4)
+model_long, acc_long, pred_long, ytest_long =  mth.fitPredictValSet(XLong, yLong, X_val, y_val_long, 'knnr', 0, neighbors=4)
+
+
+
+axes = plt.subplots(1, figsize=(5, 4))
+line = np.linspace(0, 1, 1111).reshape(-1, 1)
+
+plt.plot(line, ytest_lat)
+plt.plot(line, pred_lat)
+
+error = sqrt(mean_squared_error(ytest_lat,pred_lat))
+
+error
 model, lists = mth.evalHyperParams(XFloor, yFloor, X_val, y_val_f, 'knn', 2)
-finalmodel, models = mth.evaluateModels(XFloor, yFloor, X_val, y_val_f, [['knn', 5], ['tree',None], ['forest',None]])
+finalmodel_bf, models_bf = mth.evaluateModels(XBuildFloor, yBuildFloor, X_val, y_val_bf, [['knn', 4], ['tree', None], ['forest', None]], 1)
+finalmodel_f, models_f = mth.evaluateModels(XFloor, yFloor, X_val, y_val_f, [['knn', 4], ['tree', None], ['forest', None]], 1)
+
+model_lat, lists_lat = mth.evalHyperParams(XLat, yLat, X_val, y_val_lat, 'knnr', 3, 3)
+model_long, lists_long = mth.evalHyperParams(XLong, yLong, X_val, y_val_long, 'rnr', 1, 4)
+
+
+
 for j in range(1,len(lists)): 
     print(j)
 #    lists[j].append(model[j])
-    
+   df2['LATITUDE']
+   df2['BUILDINGID']
+   df2['BUILDINGFLOOR']
 mylists = [[],[],[],[]]
 #for i in range(0,1):
 model = mth.fitPredictValSet(XFloor, yFloor, X_val, y_val_f, 'knn', 2)
@@ -141,16 +90,13 @@ acc_val_f = accuracy_score(val_pred_f, valSet_y_f)
 
 accuracies_b, train_test_b_cv = mth.checkKCV(XBuild, yBuild, 5, 10)
 
-pred_b_tree, cm_b_tree, model_b_tree, train_test_b_tree = mth.fitTreePredict(XBuild, yBuild)
 val_pred_b_tree, val_cm_b_tree = mth.predictTest(model_b_tree, valSet_X, valSet_y_b)
 acc_val_b_tree = mth.accuracy_score(val_pred_b_tree, valSet_y_b)
 
 #decision tree
-pred_b_tree, cm_b_tree, model_b_tree, train_test_b_tree = mth.fitTreePredict(XBuild, yBuild)
 val_pred_b_tree, val_cm_b_tree = mth.predictTest(model_b_tree, valSet_X, valSet_y_b)
 acc_val_b_tree = mth.accuracy_score(val_pred_b_tree, valSet_y_b)
 
-pred_f_tree, cm_f_tree, model_f_tree, train_test_f_tree = mth.fitTreePredict(XFloor, yFloor)
 val_pred_f_tree, val_cm_f_tree = mth.predictTest(model_f_tree, valSet_X, valSet_y_f)
 acc_val_f_tree = mth.accuracy_score(val_pred_f_tree, valSet_y_f )
 
@@ -162,15 +108,6 @@ val_pred_comp_f_tree = pd.concat([val_pred_comp_f_tree, valSet_y_f], axis=1)
 import plotly.express as px
 layout = px.scatter_3d(df2, x='LATITUDE', y='LONGITUDE', z='FLOOR')
 
-
-
-
-
-
-
-y = np.array(val_pred_comp_b[0])
-yy = np.array(val_pred_comp_b['BUILDINGID'])
-acc2 = kasra_score(val_pred_comp_b[0], val_pred_comp_b['BUILDINGID'])
 
 
 
